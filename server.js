@@ -1,9 +1,13 @@
 const path = require('path');
 const express = require('express');
+const bodyParser = require('body-parser');
 const Stripe = require('stripe');
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY); //|| 'sk_test_51QV1GQFTxUtP1E0qXgWALeObPMxehMmlNRoN1ZclaKuzYPflpqS78imiTN1hwshmFGqNkx11a9c9z0R3fm771ZEg00eBR4h5oP');
 const SUCCESS_URL = 'https://owly.byethost7.com/success.html'; // Mirror premium flow
+const axios = require('axios');
+const PREMIUM_PRODUCT_ID = 'prod_Rse8IiTZ6IEgar';
+const GODOT_SERVER_PORT = 8080; // Match Godot's local port
 const CANCEL_URL = 'https://owly.byethost7.com/cancel.html';
 
 // ======== SHOP ITEMS CONFIGURATION ========
@@ -99,11 +103,63 @@ const SHOP_ITEMS2 = {
   },
 };
 // ======== END OF SHOP CONFIG ========
+// ======================
+// WEBHOOK CONFIGURATION
+// ======================
+app.post('/webhook', 
+    bodyParser.raw({ type: 'application/json' }),
+    async (req, res) => {
+        const sig = req.headers['stripe-signature'];
+        
+        try {
+            const event = stripe.webhooks.constructEvent(
+                req.body,
+                sig,
+                process.env.STRIPE_WEBHOOK_SECRET
+            );
+
+            switch (event.type) {
+                case 'checkout.session.completed':
+                    const session = event.data.object;
+                    console.log('✅ Payment succeeded:', session.id);
+
+                    // Extract customer details
+                    const email = session.customer_details?.email;
+                    if (!email) throw new Error('No email in session');
+
+                    // Handle customer association
+                    const customer = await handleCustomerCreation(
+                        email,
+                        session.customer_details?.name
+                    );
+
+                    // Update payment intent with customer ID
+                    if (session.payment_intent) {
+                        await stripe.paymentIntents.update(session.payment_intent, {
+                            customer: customer.id
+                        });
+                    }
+
+                    // Notify Godot and finalize
+                    await activatePremiumFeatures(email);
+                    break;
+
+                default:
+                    console.log(`⚠️ Unhandled event: ${event.type}`);
+            }
+
+            res.status(200).json({ received: true });
+
+        } catch (err) {
+            console.error('❌ Webhook Error:', err.message);
+            res.status(400).send(`Webhook Error: ${err.message}`);
+        }
+    }
+);
+
 
 // Middleware to parse JSON
 app.use(express.json());
-
-// Enable CORS (Cross-Origin Resource Sharing)
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
@@ -171,9 +227,6 @@ app.post('/create_checkout_session', async (req, res) => {
     }
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // ======== SHOP ENDPOINTS ========
 app.post('/create_shop_session', async (req, res) => {
@@ -272,3 +325,66 @@ app.post('/verify_shop_purchase', async (req, res) => {
         });
     }
 });
+
+// ======================
+// PREMIUM STATUS CHECK
+// ======================
+app.post('/check_premium_status', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) throw new Error('Email required');
+    const hasPremium = await checkPremiumStatus(email);
+    res.send({ premium: hasPremium });
+  } catch (error) {
+    console.error("Premium Check Failed:", error.message);
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// ======================
+// HELPER FUNCTIONS
+// ======================
+async function handleCustomerCreation(email, name) {
+    const existing = await stripe.customers.list({ email, limit: 1 });
+    return existing.data[0] || await stripe.customers.create({ email, name });
+}
+
+async function checkPremiumStatus(email) {
+    // Check charges directly associated with customers
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    if (customers.data.length > 0) {
+        const customerCharges = await stripe.charges.list({
+            customer: customers.data[0].id,
+            limit: 100
+        });
+        if (customerCharges.data.some(isValidCharge)) return true;
+    }
+
+    // Check charges with matching email
+    const allCharges = await stripe.charges.list({ limit: 100 });
+    return allCharges.data.some(charge => 
+        charge.billing_details?.email === email && isValidCharge(charge)
+    );
+}
+
+function isValidCharge(charge) {
+    return charge.status === 'succeeded' && 
+           charge.metadata.product_id === PREMIUM_PRODUCT_ID;
+}
+
+async function activatePremiumFeatures(email) {
+    try {
+        console.log(`🎉 Activating premium for: ${email}`);
+        // Notify Godot game via local server
+        await axios.get(`http://localhost:${GODOT_SERVER_PORT}`, {
+            params: { email }
+        });
+    } catch (error) {
+        console.error('⚠️ Failed to notify Godot:', error.message);
+        // Implement retry logic here if needed
+    }
+}
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
