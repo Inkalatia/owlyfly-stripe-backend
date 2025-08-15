@@ -8,9 +8,11 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.17.1",
-    "stripe": "^10.0.0"
-  },
+  "express": "^4.17.1",
+  "stripe": "^10.0.0",
+  "axios": "^1.8.0",
+  "body-parser": "^1.20.2"
+}
   "repository": {
     "url": "https://glitch.com/edit/#!/glitch-hello-node"
   },
