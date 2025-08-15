@@ -2,7 +2,7 @@
   "name": "owlyfly-stripe-backend",
   "version": "1.0.0",
   "engines": {
-    "node": "18.x"  // Cyclic uses Node 18
+    "node": "18.x"
   },
   "scripts": {
     "start": "node server.js"
