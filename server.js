@@ -103,6 +103,7 @@ const SHOP_ITEMS2 = {
   },
 };
 // ======== END OF SHOP CONFIG ========
+
 // ======================
 // WEBHOOK CONFIGURATION
 // ======================
@@ -167,7 +168,7 @@ app.use((req, res, next) => {
 });
 
 
-// Add health check endpoint (REQUIRED by Cyclic)
+// Add health check endpoint 
 app.get('/', (req, res) => {
   res.send('OwlyFly Stripe Backend Online');
 });
