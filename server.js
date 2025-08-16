@@ -4,11 +4,11 @@ const bodyParser = require('body-parser');
 const Stripe = require('stripe');
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY); //|| 'sk_test_51QV1GQFTxUtP1E0qXgWALeObPMxehMmlNRoN1ZclaKuzYPflpqS78imiTN1hwshmFGqNkx11a9c9z0R3fm771ZEg00eBR4h5oP');
-const SUCCESS_URL = 'https://owly.byethost7.com/success.html'; // Mirror premium flow
+const SUCCESS_URL = 'https://inkalatia.github.io/success/success.html'; // Mirror premium flow
 const axios = require('axios');
 const PREMIUM_PRODUCT_ID = 'prod_Rse8IiTZ6IEgar';
 const GODOT_SERVER_PORT = 8080; // Match Godot's local port
-const CANCEL_URL = 'https://owly.byethost7.com/cancel.html';
+const CANCEL_URL = 'https://inkalatia.github.io/cancel/cancel.html';
 
 
 // ======== SHOP ITEMS CONFIGURATION ========
